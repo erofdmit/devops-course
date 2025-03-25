@@ -1,8 +1,15 @@
-# Dockerfile
 FROM apache/airflow:2.7.1
 
-# Устанавливаем рабочую директорию по умолчанию для Airflow
 WORKDIR /opt/airflow
 
-# Копируем каталог с DAG'ами в директорию образа
-COPY dags/ /opt/airflow/dags/
+USER root 
+RUN apt update && apt -y install procps default-jre 
+
+USER airflow
+COPY ./dags/* ./dags/
+COPY ./spark/* ./spark/
+# Install the Spark provider
+RUN pip3 install apache-airflow-providers-apache-spark==4.1.0
+
+# Default command (can be overridden in docker-compose)
+CMD ["airflow", "webserver"]
