@@ -233,7 +233,7 @@ services:
 
   spark-master: # мастер нода в кластере Spark
     container_name: spark-master # ОБЯЗАТЕЛЬНО, т.к. на этот параметр многое завязано. В докере container_name = hostname внутри контейнера, т.е. это доменное имя виртуального хост
-    image: apache/spark:latest # на момент написания текста лабораторной latest
+    image: apache/spark:latest # на момент написания текста лабораторной latest  3.5.0
     ports:
       - '4040:8080' # Spark WebUI port
       - '7077:7077' # Spark connection port
@@ -248,67 +248,5 @@ services:
       - "7000:7000"
     command: '/opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077' # команда для запуска сервиса в режиме воркер и подключения к мастер
 
-  loki: # сервис-обработчик логов
-    image: grafana/loki:2.9.0
-    ports:
-      - "3100:3100"
-    command: -config.file=/etc/loki/local-config.yaml # запуск с дефолтным конфигом
-  promtail: # сервис-сборщик логов
-    image: grafana/promtail:2.9.0
-    volumes:
-      - ./logs:/opt/logs # здесь `./logs` - это локальная директория, которая монтируется в /opt/airflow/logs! Может называться по-другому
-      - ./promtail_config.yml:/etc/promtail/config.yml # локальное имя можно любое
-    command: -config.file=/etc/promtail/config.yml
-  grafana: # сервис визуализации
-    environment:
-      - GF_PATHS_PROVISIONING=/etc/grafana/provisioning # просто
-      - GF_AUTH_ANONYMOUS_ENABLED=true # дефолтные
-      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin # настройки
-    command: /run.sh
-    image: grafana/grafana:latest
-    ports:
-      - "3000:3000"
-
-  postgres-zabbix: # сервис-клон postgres, но для забикса (так что имена поменялись соответствующе)
-    image: postgres:13
-    environment:
-      POSTGRES_USER: zabbix
-      POSTGRES_PASSWORD: zabbix
-      POSTGRES_DB: zabbix
-    volumes:
-      - zabbix-db:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD", "pg_isready", "-U", "zabbix"]
-      interval: 10s
-      retries: 5
-      start_period: 5s
-
-  zabbix-server:
-    image: zabbix/zabbix-server-pgsql:ubuntu-6.4-latest # непосредственно бэкенд забикса
-    ports:
-     - "10051:10051"
-    depends_on:
-     - postgres-zabbix
-    environment:
-      POSTGRES_USER: zabbix
-      POSTGRES_PASSWORD: zabbix
-      POSTGRES_DB: zabbix
-      DB_SERVER_HOST: postgres-zabbix
-      ZBX_HOSTNAME: zabbix-server
-
-  zabbix-web-nginx-pgsql:
-    image: zabbix/zabbix-web-nginx-pgsql:ubuntu-6.4-latest # фронтенд забикса
-    ports:
-     - "8082:8080" # внешний порт можно любой
-    depends_on:
-     - postgres-zabbix
-    environment:
-      POSTGRES_USER: zabbix
-      POSTGRES_PASSWORD: zabbix
-      POSTGRES_DB: zabbix
-      DB_SERVER_HOST: postgres-zabbix
-      ZBX_SERVER_HOST: zabbix-server
-
 volumes:
   airflow-db:
-  zabbix-db: # не забыть добавить новый вол
