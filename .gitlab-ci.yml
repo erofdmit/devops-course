@@ -1,0 +1,66 @@
+stages:
+  - test
+  - build
+  - deploy
+
+test-job:
+  stage: test
+  image: alpine:latest
+  tags: ["docker_0910"]
+  script:
+    - echo "Проверка наличия каталогов dags/ и spark/..."
+    - test -d dags || { echo "Каталог dags/ не найден"; exit 1; }
+    - test -d spark || { echo "Каталог spark/ не найден"; exit 1; }
+  rules:
+    - when: always
+
+build-job:
+  stage: build
+  image: docker:latest
+  tags: ["docker_0910"]
+  services:
+    - name: docker:dind
+      alias: docker
+  variables:
+    DOCKER_DRIVER: overlay2
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ""
+  script:
+    - echo "Сборка Docker образа..."
+    - ls -la
+    - docker build -f Dockerfile .
+  rules:
+    # Если имя ветки начинается с "feature/", сборка запускается вручную
+    - if: '$CI_COMMIT_REF_NAME =~ /^feature\//'
+      when: manual
+    - when: on_success
+
+deploy-job:
+  stage: deploy
+  image: tmaier/docker-compose:latest
+  tags: ["docker_0910"]
+  services:
+    - name: docker:dind
+      alias: docker
+  variables:
+    DOCKER_DRIVER: overlay2
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ""
+  script:
+    - echo "Деплой приложения..."
+    - docker-compose -f docker-compose.yaml rm -sf
+    - docker-compose -f docker-compose.yaml up -d
+    - echo "Приложение успешно задеплоено!"
+  rules:
+    # Деплой запускается автоматически только для веток main, master и develop
+    - if: '$CI_COMMIT_REF_NAME == "main" || $CI_COMMIT_REF_NAME == "master" || $CI_COMMIT_REF_NAME == "develop"'
+      when: on_success
+    - when: never
+
+clear-job:
+  stage: deploy
+  image: tmaier/docker-compose:latest
+  script:
+    - docker-compose -f docker-compose.yaml rm -sf
+  rules:
+    - when: manual
